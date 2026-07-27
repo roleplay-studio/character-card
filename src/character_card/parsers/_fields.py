@@ -29,6 +29,7 @@ the V2/V3 specs:
 
 from __future__ import annotations
 
+from ..lorebook_normalize import normalize_entry
 from ..models import CharacterCardData, CharacterCardParseError
 
 
@@ -95,13 +96,33 @@ def map_fields(
         character_book = None
 
     knowledge: list[str] = []
+    norm_keys: list[list[str]] = []
+    norm_sec: list[list[str]] = []
+    norm_enabled: list[bool] = []
+    norm_insertion: list[int] = []
+    norm_position: list[str] = []
+    norm_priority: list[int] = []
+    norm_case: list[bool] = []
     if character_book is not None:
-        for entry in character_book.get("entries") or []:
+        raw_entries = character_book.get("entries") or []
+        # Single pass: build the flattened content view AND the
+        # normalised spec-shaped fields in parallel. Both share
+        # the same dict-check (skip non-dict entries) and the same
+        # ordering as ``character_book['entries']``.
+        for entry in raw_entries:
             if not isinstance(entry, dict):
                 continue
             content = (entry.get("content") or "").strip()
             if content:
                 knowledge.append(content)
+            n = normalize_entry(entry)
+            norm_keys.append(n["keys"])
+            norm_sec.append(n["secondary_keys"])
+            norm_enabled.append(n["enabled"])
+            norm_insertion.append(n["insertion_order"])
+            norm_position.append(n["position"])
+            norm_priority.append(n["priority"])
+            norm_case.append(n["case_sensitive"])
 
     # ── V2 data.extensions: preserve as opaque dict ────────────────
     raw_ext = data.get("extensions")
@@ -156,6 +177,14 @@ def map_fields(
         # Opaque spec bags
         extensions=extensions,
         character_book=character_book,
+        # Normalised lorebook (parallel to character_book['entries'])
+        character_book_keys=norm_keys,
+        character_book_secondary_keys=norm_sec,
+        character_book_enabled=norm_enabled,
+        character_book_insertion_order=norm_insertion,
+        character_book_position=norm_position,
+        character_book_priority=norm_priority,
+        character_book_case_sensitive=norm_case,
         # V3-only
         assets=assets,
         nickname=nickname,
